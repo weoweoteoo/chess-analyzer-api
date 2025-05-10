@@ -1,0 +1,5 @@
+python-chess
+stockfish
+pandas
+matplotlib
+scikit-learn
