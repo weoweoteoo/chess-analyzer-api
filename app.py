@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 @app.route("/api/analyze", methods=["GET"])
 def analyze():
-    pgn_path = "data/sample_game.pgn"  # You can change this to dynamic via request.args
+    pgn_path = "data/sample_game.pgn"
     engine_path = "engine/stockfish"
 
     try:
@@ -15,4 +15,4 @@ def analyze():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(debug=True, host="0.0.0.0", port=5000)
