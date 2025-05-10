@@ -1,7 +1,17 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from utils.analyzer import analyze_game
 
 app = Flask(__name__)
+
+
+CORS(app, origins=[
+    "http://localhost:5173",
+    "https://chess-rating.onrender.com",
+    "https://chess-rating.vercel.app",
+    "https://chess-sh.netlify.app",
+    "https://chess-analyzer-api-production.up.railway.app"
+])
 
 @app.route("/api/analyze", methods=["GET"])
 def analyze():
