@@ -4,10 +4,8 @@ WORKDIR /app
 
 COPY . .
 
+RUN chmod +x engine/stockfish
+
 RUN pip install --no-cache-dir -r requirements.txt
-
-RUN chmod +x /engine/stockfish
-
-EXPOSE 5000
 
 CMD ["python", "app.py"]
