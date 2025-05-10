@@ -6,7 +6,7 @@ COPY . .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN chmod +x /app/stockfish
+RUN chmod +x /engine/stockfish
 
 EXPOSE 5000
 
