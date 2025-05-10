@@ -3,3 +3,5 @@ stockfish
 pandas
 matplotlib
 scikit-learn
+flask 
+chess
