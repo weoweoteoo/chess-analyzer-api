@@ -13,7 +13,7 @@ CORS(app, origins=[
     "https://chess-analyzer-api-production.up.railway.app"
 ])
 
-@app.route("/api/analyze", methods=["GET"])
+@app.route("/api/analyze", methods=["POST"])
 def analyze():
     pgn_path = "data/sample_game.pgn"
     engine_path = "engine/stockfish"
