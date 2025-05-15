@@ -1,9 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from utils.analyzer import analyze_game
+from utils.analyzer import analyze_game_from_moves  # You need to implement this function
 
 app = Flask(__name__)
-
 
 CORS(app, origins=[
     "http://localhost:5173",
@@ -15,12 +14,18 @@ CORS(app, origins=[
 
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
-    pgn_path = "data/sample_game.pgn"
-    engine_path = "engine/stockfish"
-
     try:
-        result = analyze_game(pgn_path, engine_path)
+        data = request.get_json()
+        moves = data.get("moves")
+        player_color = data.get("playerColor")
+        winner = data.get("winner")
+
+        if not moves or not player_color or not winner:
+            return jsonify({"error": "Missing required fields: moves, playerColor, or winner."}), 400
+
+        result = analyze_game_from_moves(moves, player_color, winner)
         return jsonify(result)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
