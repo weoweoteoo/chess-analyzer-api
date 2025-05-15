@@ -1,5 +1,9 @@
 import chess
 import chess.engine
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def classify_move(cp_loss):
     if cp_loss < 50:
@@ -24,35 +28,44 @@ def suggest_from_counts(blunders, mistakes, inaccuracies):
     return suggestions
 
 def analyze_game(moves, player_color, winner, engine_path):
+    logging.info("Starting analysis with engine at %s", engine_path)
+
     board = chess.Board()
     engine = chess.engine.SimpleEngine.popen_uci(engine_path)
 
     move_data = []
+    total_cp_loss = 0
     blunders = 0
     mistakes = 0
     inaccuracies = 0
-    total_cp_loss = 0
-
     move_number = 1
-    for move in moves:
-        try:
-            uci_move = board.parse_san(move)
-        except:
+
+    for uci_move in moves:
+        if board.is_game_over():
             break
+
+        try:
+            move = board.parse_uci(uci_move)
+        except Exception as e:
+            logging.error("Invalid move format: %s", uci_move)
+            continue
+
+        if not move in board.legal_moves:
+            logging.warning("Illegal move skipped: %s", uci_move)
+            continue
 
         # Evaluate before move
         info_before = engine.analyse(board, chess.engine.Limit(depth=15))
         score_before = info_before["score"].relative.score(mate_score=10000)
 
-        board.push(uci_move)
+        board.push(move)
 
         # Evaluate after move
         info_after = engine.analyse(board, chess.engine.Limit(depth=15))
         score_after = info_after["score"].relative.score(mate_score=10000)
 
-        if score_before is None or score_after is None:
-            cp_loss = 0
-        else:
+        cp_loss = 0
+        if score_before is not None and score_after is not None:
             cp_loss = score_before - score_after
 
         classification = classify_move(abs(cp_loss))
@@ -64,14 +77,19 @@ def analyze_game(moves, player_color, winner, engine_path):
         elif classification == "Inaccuracy":
             inaccuracies += 1
 
+        san = board.san(board.peek())  # last move in SAN
+
+        logging.info("Move %d: %s | CP Loss: %s | Class: %s", move_number, san, cp_loss, classification)
+
         move_data.append({
             "Move Number": move_number,
-            "Move": move,
+            "Move": san,
             "CP Loss": cp_loss,
             "Classification": classification
         })
-        move_number += 1
+
         total_cp_loss += abs(cp_loss)
+        move_number += 1
 
     engine.quit()
 
@@ -80,15 +98,18 @@ def analyze_game(moves, player_color, winner, engine_path):
     accuracy = round((good_moves / total_moves) * 100, 2) if total_moves > 0 else 0
 
     summary = {
-        "player_color": player_color,
-        "winner": winner,
+        "player": player_color,
         "total_moves": total_moves,
         "accuracy": accuracy,
         "blunders": blunders,
         "mistakes": mistakes,
         "inaccuracies": inaccuracies,
+        "winner": winner,
         "suggestions": suggest_from_counts(blunders, mistakes, inaccuracies),
         "worst_moves": sorted(move_data, key=lambda x: abs(x["CP Loss"]), reverse=True)[:5]
     }
+
+    logging.info("Analysis complete: %d moves, %d blunders, %d mistakes, %d inaccuracies", 
+                 total_moves, blunders, mistakes, inaccuracies)
 
     return summary
