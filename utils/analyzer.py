@@ -1,14 +1,9 @@
+import chess
 import chess.pgn
 import chess.engine
-import os
-import json
-import matplotlib.pyplot as plt
-
+import io
 
 def classify_move(cp_loss):
-    """
-    Classify the move based on the CP loss.
-    """
     if cp_loss < 50:
         return "Best"
     elif cp_loss < 100:
@@ -18,11 +13,7 @@ def classify_move(cp_loss):
     else:
         return "Blunder"
 
-
 def suggest_from_counts(blunders, mistakes, inaccuracies):
-    """
-    Generate improvement suggestions based on the number of blunders, mistakes, and inaccuracies.
-    """
     suggestions = []
     if blunders > 0:
         suggestions.append("Avoid blunders by thinking deeper before major captures or sacrifices.")
@@ -34,88 +25,69 @@ def suggest_from_counts(blunders, mistakes, inaccuracies):
         suggestions.append("Great game! Keep practicing to maintain accuracy.")
     return suggestions
 
-
-def analyze_game(pgn_path, engine_path):
-    """
-    Analyze a chess game from a PGN file using Stockfish engine, and return a dictionary with the analysis results.
-    
-    :param pgn_path: Path to the PGN file containing the game.
-    :param engine_path: Path to the Stockfish engine executable.
-    :return: A dictionary containing the game analysis.
-    """
-    # Open the PGN file
-    with open(pgn_path) as pgn:
-        game = chess.pgn.read_game(pgn)
-
-    # Get player name (White or Black)
-    player_name = game.headers.get("White", "Player")
+def analyze_game_from_moves(moves, player_color, winner):
+    game = chess.pgn.Game()
     board = game.board()
-    engine = chess.engine.SimpleEngine.popen_uci(engine_path)
 
-    move_data = []
+    for move_str in moves:
+        try:
+            move = board.push_san(move_str)
+        except ValueError:
+            raise ValueError(f"Invalid move: {move_str}")
+
+    engine_path = "engine/stockfish"
+    analysis = []
     total_cp_loss = 0
     blunders = 0
     mistakes = 0
     inaccuracies = 0
     move_number = 1
 
-    node = game
-    while node.variations:
-        next_node = node.variation(0)
-        move = next_node.move
+    with chess.engine.SimpleEngine.popen_uci(engine_path) as engine:
+        board = game.board()
+        for move_str in moves:
+            move = board.push_san(move_str)
+            info_before = engine.analyse(board, chess.engine.Limit(depth=15))
+            score_before = info_before["score"].white().score(mate_score=10000)
 
-        # Get the move in SAN (Standard Algebraic Notation)
-        san_move = board.san(move)
+            info_after = engine.analyse(board, chess.engine.Limit(depth=15))
+            score_after = info_after["score"].white().score(mate_score=10000)
 
-        # Evaluate before the move
-        info_before = engine.analyse(board, chess.engine.Limit(depth=15))
-        score_before = info_before["score"].relative.score(mate_score=10000)
+            cp_loss = (score_before - score_after) if score_before is not None and score_after is not None else 0
+            classification = classify_move(abs(cp_loss))
 
-        board.push(move)
+            if classification == "Blunder":
+                blunders += 1
+            elif classification == "Mistake":
+                mistakes += 1
+            elif classification == "Inaccuracy":
+                inaccuracies += 1
 
-        # Evaluate after the move
-        info_after = engine.analyse(board, chess.engine.Limit(depth=15))
-        score_after = info_after["score"].relative.score(mate_score=10000)
+            analysis.append({
+                "Move Number": move_number,
+                "Move": move_str,
+                "CP Loss": cp_loss,
+                "Classification": classification
+            })
 
-        # Calculate CP loss (change in evaluation)
-        cp_loss = (score_before - score_after) if score_before is not None and score_after is not None else 0
-        classification = classify_move(abs(cp_loss))
+            total_cp_loss += abs(cp_loss)
+            move_number += 1
 
-        if classification == "Blunder":
-            blunders += 1
-        elif classification == "Mistake":
-            mistakes += 1
-        elif classification == "Inaccuracy":
-            inaccuracies += 1
+        engine.quit()
 
-        move_data.append({
-            "Move Number": move_number,
-            "Move": san_move,
-            "CP Loss": cp_loss,
-            "Classification": classification
-        })
-
-        total_cp_loss += abs(cp_loss)
-        node = next_node
-        move_number += 1
-
-    engine.quit()
-
-    total_moves = len(move_data)
+    total_moves = len(analysis)
     good_moves = total_moves - blunders - mistakes - inaccuracies
     accuracy = round((good_moves / total_moves) * 100, 2) if total_moves > 0 else 0
 
-    # Create the game analysis summary
-    summary = {
-        "player": player_name,
-        "total_moves": total_moves,
+    return {
+        "playerColor": player_color,
+        "winner": winner,
+        "totalMoves": total_moves,
         "accuracy": accuracy,
         "blunders": blunders,
         "mistakes": mistakes,
         "inaccuracies": inaccuracies,
         "suggestions": suggest_from_counts(blunders, mistakes, inaccuracies),
-        "worst_moves": sorted(move_data, key=lambda x: abs(x["CP Loss"]), reverse=True)[:5]  # Top 5 worst moves
+        "worstMoves": sorted(analysis, key=lambda x: abs(x["CP Loss"]), reverse=True)[:5],
+        "analysis": analysis
     }
-
-    # Return the analysis summary dictionary
-    return summary
