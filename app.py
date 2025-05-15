@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from utils.analyzer import analyze_game_from_moves  # You need to implement this function
+from utils.analyzer import analyze_game
 
 app = Flask(__name__)
 
@@ -12,22 +12,34 @@ CORS(app, origins=[
     "https://chess-analyzer-api-production.up.railway.app"
 ])
 
+# Global variable to hold last result
+last_analysis_result = {}
+
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
+    global last_analysis_result
+    data = request.get_json()
+
+    moves = data.get("moves")
+    player_color = data.get("playerColor")
+    winner = data.get("winner")
+    engine_path = "engine/stockfish"
+
+    if not all([moves, player_color, winner]):
+        return jsonify({"error": "Missing required fields: moves, playerColor, or winner"}), 400
+
     try:
-        data = request.get_json()
-        moves = data.get("moves")
-        player_color = data.get("playerColor")
-        winner = data.get("winner")
-
-        if not moves or not player_color or not winner:
-            return jsonify({"error": "Missing required fields: moves, playerColor, or winner."}), 400
-
-        result = analyze_game_from_moves(moves, player_color, winner)
+        result = analyze_game(moves, player_color, winner, engine_path)
+        last_analysis_result = result
         return jsonify(result)
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/api/result", methods=["GET"])
+def get_result():
+    if not last_analysis_result:
+        return jsonify({"message": "No analysis available yet"}), 404
+    return jsonify(last_analysis_result)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
