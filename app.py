@@ -1,9 +1,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from utils.analyzer import analyze_game
+import logging
+
+# Setup basic logging
+logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 
+# Enable CORS for allowed origins
 CORS(app, origins=[
     "http://localhost:5173",
     "https://chess-rating.onrender.com",
@@ -20,6 +25,9 @@ def analyze():
     global last_analysis_result
     data = request.get_json()
 
+    # Log the received JSON data
+    logging.info("Received data from frontend: %s", data)
+
     moves = data.get("moves")
     player_color = data.get("playerColor")
     winner = data.get("winner")
@@ -33,6 +41,7 @@ def analyze():
         last_analysis_result = result
         return jsonify(result)
     except Exception as e:
+        logging.error("Error during analysis: %s", e)
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/result", methods=["GET"])
