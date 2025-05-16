@@ -52,14 +52,16 @@ def analyze_game(moves, player_color, winner, engine_path):
     total_cp_loss = 0
     move_number = 1
 
-    for move in moves:
+    for i, move in enumerate(moves):
+        print(f"Analyzing move {i+1}: {move}")
         try:
             chess_move = board.parse_san(move)
         except ValueError:
             try:
                 chess_move = board.parse_uci(move)
             except ValueError:
-                break  # Invalid move, skip analysis
+                print(f"⚠️ Invalid move at index {i}: {move} — skipping rest of game.")
+                break  # Invalid move, stop analysis
 
         # Evaluate before the move
         info_before = engine.analyse(board, chess.engine.Limit(depth=15))
