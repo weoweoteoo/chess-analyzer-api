@@ -3,7 +3,7 @@ import chess.engine
 import logging
 
 # Setup logging for analyzer (if not already)
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 def classify_move(cp_loss):
