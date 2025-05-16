@@ -1,11 +1,7 @@
 import chess
 import chess.engine
 
-
 def classify_move(cp_loss):
-    """
-    Classify the move based on the CP (centipawn) loss.
-    """
     if cp_loss < 50:
         return "Best"
     elif cp_loss < 100:
@@ -15,11 +11,7 @@ def classify_move(cp_loss):
     else:
         return "Blunder"
 
-
 def suggest_from_counts(blunders, mistakes, inaccuracies):
-    """
-    Generate improvement suggestions based on the number of blunders, mistakes, and inaccuracies.
-    """
     suggestions = []
     if blunders > 0:
         suggestions.append("Avoid blunders by thinking deeper before major captures or sacrifices.")
@@ -31,17 +23,7 @@ def suggest_from_counts(blunders, mistakes, inaccuracies):
         suggestions.append("Great game! Keep practicing to maintain accuracy.")
     return suggestions
 
-
 def analyze_game(moves, player_color, winner, engine_path):
-    """
-    Analyze a chess game given a list of moves, the player's color, and the game result.
-
-    :param moves: List of UCI or SAN moves.
-    :param player_color: "white" or "black"
-    :param winner: "white", "black", or "draw"
-    :param engine_path: Path to the Stockfish engine.
-    :return: Dictionary with analysis results.
-    """
     board = chess.Board()
     engine = chess.engine.SimpleEngine.popen_uci(engine_path)
 
@@ -53,23 +35,20 @@ def analyze_game(moves, player_color, winner, engine_path):
     move_number = 1
 
     for i, move in enumerate(moves):
-        print(f"Analyzing move {i+1}: {move}")
         try:
             chess_move = board.parse_san(move)
         except ValueError:
             try:
                 chess_move = board.parse_uci(move)
             except ValueError:
-                print(f"⚠️ Invalid move at index {i}: {move} — skipping rest of game.")
-                break  # Invalid move, stop analysis
+                print(f"⚠ Invalid move at index {i}: {move} — skipping rest of game.")
+                break
 
-        # Evaluate before the move
         info_before = engine.analyse(board, chess.engine.Limit(depth=15))
         score_before = info_before["score"].relative.score(mate_score=10000)
 
         board.push(chess_move)
 
-        # Evaluate after the move
         info_after = engine.analyse(board, chess.engine.Limit(depth=15))
         score_after = info_after["score"].relative.score(mate_score=10000)
 
