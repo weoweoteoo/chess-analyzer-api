@@ -1,49 +1,67 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
+from utils.analyzer import analyze_game
 import logging
-from chess_analysis import analyze_game
 
-app = Flask(__name__)
+# Setup logging
 logging.basicConfig(level=logging.INFO)
 
-ENGINE_PATH = "/usr/games/stockfish"  # Change this if your Stockfish path differs
+app = Flask(__name__)
 
+# Enable CORS
+CORS(app, origins=[
+    "http://localhost:5173",
+    "https://chess-rating.onrender.com",
+    "https://chess-rating.vercel.app",
+    "https://chess-sh.netlify.app",
+    "https://chess-analyzer-api-production.up.railway.app"
+])
+
+# Global cache of last analysis
+last_analysis_result = {}
 
 def remove_consecutive_duplicates(moves):
     """
-    Remove consecutive duplicate moves.
+    Removes consecutive duplicate moves (often sent by frontend).
     """
-    deduped = []
+    cleaned = []
     for move in moves:
-        if not deduped or deduped[-1] != move:
-            deduped.append(move)
-    return deduped
+        if not cleaned or cleaned[-1] != move:
+            cleaned.append(move)
+    return cleaned
 
-
-@app.route('/api/analyze', methods=['POST'])
+@app.route("/api/analyze", methods=["POST"])
 def analyze():
+    global last_analysis_result
     data = request.get_json()
-    logging.info(f"Received data from frontend: {data}")
+
+    logging.info("Received data from frontend: %s", data)
+
+    moves = data.get("moves")
+    player_color = data.get("playerColor")
+    winner = data.get("winner")
+    engine_path = "engine/stockfish"
+
+    if not all([moves, player_color, winner]):
+        return jsonify({"error": "Missing required fields: moves, playerColor, or winner"}), 400
+
+    # Clean up moves
+    cleaned_moves = remove_consecutive_duplicates(moves)
+    logging.info("Cleaned moves for analysis: %s", cleaned_moves)
 
     try:
-        raw_moves = data['moves']
-        player_color = data['playerColor']
-        winner = data['winner']
-
-        # Clean up repeated moves
-        cleaned_moves = remove_consecutive_duplicates(raw_moves)
-
-        result = analyze_game(cleaned_moves, player_color, winner, ENGINE_PATH)
+        result = analyze_game(cleaned_moves, player_color, winner, engine_path)
+        last_analysis_result = result
         return jsonify(result)
-
     except Exception as e:
-        logging.exception("Error analyzing game:")
+        logging.exception("Error during analysis")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/result", methods=["GET"])
+def get_result():
+    if not last_analysis_result:
+        return jsonify({"message": "No analysis available yet"}), 404
+    return jsonify(last_analysis_result)
 
-@app.route('/api/result', methods=['GET'])
-def result():
-    return jsonify({"message": "Endpoint working"})
-
-
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5000)
