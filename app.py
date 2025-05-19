@@ -6,9 +6,9 @@ import logging
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 
-app = Flask(__name__)
+app = Flask(_name_)
 
-# Enable CORS for frontend URLs
+# Enable CORS
 CORS(app, origins=[
     "http://localhost:5173",
     "https://chess-rating.onrender.com",
@@ -17,12 +17,12 @@ CORS(app, origins=[
     "https://chess-analyzer-api-production.up.railway.app"
 ])
 
-# Store analysis results using (playerId, matchId) as keys
-analysis_cache = {}
+# In-memory storage for all results: { playerId: { matchId: result } }
+last_analysis_result = {}
 
 def remove_consecutive_duplicates(moves):
     """
-    Removes consecutive duplicate moves.
+    Removes consecutive duplicate moves (often sent by frontend).
     """
     cleaned = []
     for move in moves:
@@ -32,7 +32,9 @@ def remove_consecutive_duplicates(moves):
 
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
+    global last_analysis_result
     data = request.get_json()
+
     logging.info("Received data from frontend: %s", data)
 
     moves = data.get("moves")
@@ -42,9 +44,8 @@ def analyze():
     match_id = data.get("matchId")
     engine_path = "engine/stockfish"
 
-    # Validate required fields
     if not all([moves, player_color, winner, player_id, match_id]):
-        return jsonify({"error": "Missing required fields: moves, playerColor, winner, playerId, or matchId"}), 400
+        return jsonify({"error": "Missing one or more required fields: moves, playerColor, winner, playerId, matchId"}), 400
 
     # Clean up moves
     cleaned_moves = remove_consecutive_duplicates(moves)
@@ -53,8 +54,10 @@ def analyze():
     try:
         result = analyze_game(cleaned_moves, player_color, winner, engine_path)
 
-        # Cache result using a tuple key (playerId, matchId)
-        analysis_cache[(player_id, match_id)] = result
+        # Store the result per player and match
+        if player_id not in last_analysis_result:
+            last_analysis_result[player_id] = {}
+        last_analysis_result[player_id][match_id] = result
 
         return jsonify(result)
     except Exception as e:
@@ -64,26 +67,17 @@ def analyze():
 @app.route("/api/result", methods=["GET"])
 def get_result():
     player_id = request.args.get("playerId")
-    match_id = request.args.get("matchId")  # Optional
+    match_id = request.args.get("matchId")
 
-    if not player_id:
-        return jsonify({"error": "Missing playerId"}), 400
+    if not player_id or not match_id:
+        return jsonify({"error": "Missing playerId or matchId parameter"}), 400
 
-    # Try to fetch exact match if matchId is given
-    if match_id:
-        result = analysis_cache.get((player_id, match_id))
-        if not result:
-            return jsonify({"message": "No analysis available for this playerId and matchId"}), 404
-        return jsonify(result)
+    result = last_analysis_result.get(player_id, {}).get(match_id)
 
-    # If matchId not provided, return the latest match for this player
-    matches = [(pid, mid) for (pid, mid) in analysis_cache if pid == player_id]
-    if not matches:
-        return jsonify({"message": "No analysis available for this playerId"}), 404
+    if not result:
+        return jsonify({"message": "No analysis available for this match"}), 404
 
-    # Return the last match added (most recent by insertion order)
-    latest_key = matches[-1]
-    return jsonify(analysis_cache[latest_key])
+    return jsonify(result)
 
-if __name__ == "__main__":
+if _name_ == "_main_":
     app.run(debug=True, host="0.0.0.0", port=5000)
