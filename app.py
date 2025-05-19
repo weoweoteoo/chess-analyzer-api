@@ -8,22 +8,16 @@ logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 
-# Allowed frontend origins list
-ALLOWED_ORIGINS = [
+# Enable CORS for your frontend origins
+CORS(app, origins=[
     "http://localhost:5173",
     "https://chess-rating.onrender.com",
     "https://chess-rating.vercel.app",
     "https://chess-sh.netlify.app",
     "https://chess-analyzer-api-production.up.railway.app"
-]
+])
 
-def cors_origin_checker(origin):
-    return origin in ALLOWED_ORIGINS
-
-# Apply CORS with dynamic origin checking
-CORS(app, origins=cors_origin_checker)
-
-# Global cache of last analyses by playerId + matchId
+# Global cache for last analyses by playerId + matchId
 last_analysis_result = {}
 
 def remove_consecutive_duplicates(moves):
@@ -53,24 +47,28 @@ def analyze():
     if not all([moves, player_color, winner, player_id, match_id]):
         return jsonify({"error": "Missing required fields: moves, playerColor, winner, playerId, or matchId"}), 400
 
-    # Clean up moves
+    # Clean moves
     cleaned_moves = remove_consecutive_duplicates(moves)
     logging.info("Cleaned moves for analysis: %s", cleaned_moves)
 
     try:
         result = analyze_game(cleaned_moves, player_color, winner, engine_path)
 
-        # Store result using playerId and matchId
+        # Store analysis result in cache
         cache_key = f"{player_id}_{match_id}"
         last_analysis_result[cache_key] = result
 
-        # Only return the result URL here
+        # Build result URL
         host = request.host_url.rstrip("/")
         result_url = f"{host}/api/result?playerId={player_id}&matchId={match_id}"
 
-        return jsonify({
+        # Return only minimal info + result_url
+        response = {
+            "playerId": player_id,
+            "matchId": match_id,
             "result_url": result_url
-        })
+        }
+        return jsonify(response)
 
     except Exception as e:
         logging.exception("Error during analysis")
@@ -89,10 +87,6 @@ def get_result():
 
     if not result:
         return jsonify({"message": "No analysis available for the provided playerId and matchId"}), 404
-
-    # Include player and match info
-    result["playerId"] = player_id
-    result["matchId"] = match_id
 
     return jsonify(result)
 
