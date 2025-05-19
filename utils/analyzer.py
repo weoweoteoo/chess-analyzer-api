@@ -44,6 +44,9 @@ def analyze_game(moves, player_color, winner, engine_path):
                 print(f"⚠ Invalid move at index {i}: {move} — skipping rest of game.")
                 break
 
+        is_player_turn = (board.turn == chess.WHITE and player_color.lower() == "white") or \
+                         (board.turn == chess.BLACK and player_color.lower() == "black")
+
         info_before = engine.analyse(board, chess.engine.Limit(depth=15))
         score_before = info_before["score"].relative.score(mate_score=10000)
 
@@ -53,23 +56,24 @@ def analyze_game(moves, player_color, winner, engine_path):
         score_after = info_after["score"].relative.score(mate_score=10000)
 
         cp_loss = (score_before - score_after) if (score_before is not None and score_after is not None) else 0
-        classification = classify_move(abs(cp_loss))
 
-        if classification == "Blunder":
-            blunders += 1
-        elif classification == "Mistake":
-            mistakes += 1
-        elif classification == "Inaccuracy":
-            inaccuracies += 1
+        if is_player_turn:
+            classification = classify_move(abs(cp_loss))
 
-        move_data.append({
-            "Move Number": move_number,
-            "Move": move,
-            "CP Loss": cp_loss,
-            "Classification": classification
-        })
+            if classification == "Blunder":
+                blunders += 1
+            elif classification == "Mistake":
+                mistakes += 1
+            elif classification == "Inaccuracy":
+                inaccuracies += 1
 
-        total_cp_loss += abs(cp_loss)
+            move_data.append({
+                "Move Number": move_number,
+                "Move": move,
+                "CP Loss": cp_loss,
+                "Classification": classification
+            })
+
         move_number += 1
 
     engine.quit()
