@@ -58,8 +58,8 @@ def analyze():
         cache_key = f"{player_id}_{match_id}"
         last_analysis_result[cache_key] = result
 
-        # Build result URL
-        host = request.host_url.rstrip("/")
+        # Force HTTPS in result URL
+        host = request.host_url.replace("http://", "https://").rstrip("/")
         result_url = f"{host}/api/result?playerId={player_id}&matchId={match_id}"
 
         # Return only minimal info + result_url
