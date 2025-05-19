@@ -86,7 +86,11 @@ def get_result():
     if not result:
         return jsonify({"message": "No analysis available for the provided playerId and matchId"}), 404
 
-    return jsonify(result)
+    # Return a copy without 'result_url'
+    result_copy = result.copy()
+    result_copy.pop("result_url", None)
+
+    return jsonify(result_copy)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
