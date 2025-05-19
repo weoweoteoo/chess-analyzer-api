@@ -17,7 +17,7 @@ CORS(app, origins=[
     "https://chess-analyzer-api-production.up.railway.app"
 ])
 
-# In-memory storage for all results: { playerId: { matchId: result } }
+# Global cache of last analyses by playerId + matchId
 last_analysis_result = {}
 
 def remove_consecutive_duplicates(moves):
@@ -45,7 +45,7 @@ def analyze():
     engine_path = "engine/stockfish"
 
     if not all([moves, player_color, winner, player_id, match_id]):
-        return jsonify({"error": "Missing one or more required fields: moves, playerColor, winner, playerId, matchId"}), 400
+        return jsonify({"error": "Missing required fields: moves, playerColor, winner, playerId, or matchId"}), 400
 
     # Clean up moves
     cleaned_moves = remove_consecutive_duplicates(moves)
@@ -54,12 +54,20 @@ def analyze():
     try:
         result = analyze_game(cleaned_moves, player_color, winner, engine_path)
 
-        # Store the result per player and match
-        if player_id not in last_analysis_result:
-            last_analysis_result[player_id] = {}
-        last_analysis_result[player_id][match_id] = result
+        # Store result using playerId and matchId
+        cache_key = f"{player_id}_{match_id}"
+        last_analysis_result[cache_key] = result
+
+        # Include player and match info in the response
+        result["playerId"] = player_id
+        result["matchId"] = match_id
+
+        # Generate result URL
+        host = request.host_url.rstrip("/")
+        result["result_url"] = f"{host}/api/result?playerId={player_id}&matchId={match_id}"
 
         return jsonify(result)
+
     except Exception as e:
         logging.exception("Error during analysis")
         return jsonify({"error": str(e)}), 500
@@ -72,10 +80,11 @@ def get_result():
     if not player_id or not match_id:
         return jsonify({"error": "Missing playerId or matchId parameter"}), 400
 
-    result = last_analysis_result.get(player_id, {}).get(match_id)
+    cache_key = f"{player_id}_{match_id}"
+    result = last_analysis_result.get(cache_key)
 
     if not result:
-        return jsonify({"message": "No analysis available for this match"}), 404
+        return jsonify({"message": "No analysis available for the provided playerId and matchId"}), 404
 
     return jsonify(result)
 
