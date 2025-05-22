@@ -1,0 +1,12 @@
+{
+    "player": "User123",
+    "total_moves": 7,
+    "accuracy": 71.43,
+    "blunders": 1,
+    "mistakes": 0,
+    "inaccuracies": 1,
+    "suggestions": [
+        "Avoid blunders by thinking deeper before major captures or sacrifices.",
+        "Improve your positional understanding and mid-game planning."
+    ]
+}
