@@ -11,7 +11,7 @@ python-chess
 stockfish
 
 # Data processing and ML dependencies
-torch==1.9.0
+torch==2.0.0  # Updated from 1.9.0 to a version that's available
 numpy==1.21.0
 pandas
 matplotlib
