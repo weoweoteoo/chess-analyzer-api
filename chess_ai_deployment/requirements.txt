@@ -14,6 +14,8 @@ stockfish
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.0.0+cpu
 numpy==1.22.0
+# Use a specific version of joblib that doesn't have the UTF-8 issue
+joblib==1.1.1
 pandas
 matplotlib
 scikit-learn
