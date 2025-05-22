@@ -1,19 +1,20 @@
 import os
 import sys
-import logging
-import random
+import collections
 
-# Compatibility fix for Python < 3.10 (MutableMapping deprecated)
+# Compatibility fix for MutableMapping for Python 3.10+
 try:
     from collections.abc import MutableMapping
 except ImportError:
     from collections import MutableMapping
 
-import collections
 if not hasattr(collections, 'MutableMapping'):
     collections.MutableMapping = MutableMapping
 
 import chess
+import logging
+import random
+import json
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
 from implementation.evaluator import ChessEvaluator
@@ -32,36 +33,65 @@ try:
     logger.info("Chess evaluator initialized successfully")
 except Exception as e:
     logger.error(f"Error initializing chess evaluator: {e}")
-    # Continue startup; AI will fail gracefully
+    # We'll continue and let the application start, but AI moves will fail
 
 @socketio.on('connect')
 def handle_connect():
+    """Handle client connection."""
     logger.info("Client connected")
 
 @socketio.on('disconnect')
 def handle_disconnect():
+    """Handle client disconnection."""
     logger.info("Client disconnected")
 
 @socketio.on('request_ai_move')
 def handle_ai_move_request(data):
+    """Socket event handler for AI move requests.
+    
+    Expected data format:
+    {
+        'moves': ['e4', 'e5', ...],  # List of moves in algebraic notation
+        'difficulty': 'beginner|intermediate|expert',
+        'game_id': 'some-unique-id'
+    }
+    """
     logger.info(f"Received AI move request: {data}")
-
+    
     try:
+        # Check if data is a string and try to parse it as JSON
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+                logger.info(f"Parsed string data into JSON: {data}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Error parsing JSON data: {e}")
+                socketio.emit('ai_move_response', {
+                    'success': False,
+                    'error': "Invalid data format. Expected JSON object.",
+                    'game_id': 'unknown'
+                })
+                return
+        
+        # Extract data from the request
         moves = data.get('moves', [])
         difficulty = data.get('difficulty', 'intermediate')
         game_id = data.get('game_id', 'unknown')
-
+        
+        # Create a board and apply all moves
         board = chess.Board()
         for move_str in moves:
             try:
+                # Try as UCI (e2e4)
                 move = chess.Move.from_uci(move_str)
                 if move in board.legal_moves:
                     board.push(move)
                     continue
             except ValueError:
                 pass
-
+            
             try:
+                # Try as SAN (e4)
                 move = board.parse_san(move_str)
                 board.push(move)
             except ValueError:
@@ -72,14 +102,16 @@ def handle_ai_move_request(data):
                     'game_id': game_id
                 })
                 return
-
+        
+        # Get AI move based on difficulty
         move = get_move_by_difficulty(board, difficulty)
-
+        
         if move:
+            # Prepare response with the AI move
             response = {
                 'success': True,
-                'move': move.uci(),
-                'san': board.san(move),
+                'move': move.uci(),  # UCI format (e.g., "e2e4")
+                'san': board.san(move),  # SAN format (e.g., "e4")
                 'evaluation': evaluator.get_centipawn_score(board),
                 'game_id': game_id
             }
@@ -91,35 +123,56 @@ def handle_ai_move_request(data):
                 'game_id': game_id
             }
             logger.warning("No legal moves available")
-
+        
+        # Emit the response back to the client
         socketio.emit('ai_move_response', response)
-
+        logger.info(f"Sent AI move response for game {game_id}")
+    
     except Exception as e:
         logger.error(f"Error handling AI move: {e}")
         socketio.emit('ai_move_response', {
             'success': False,
             'error': str(e),
-            'game_id': data.get('game_id', 'unknown')
+            'game_id': data.get('game_id', 'unknown') if isinstance(data, dict) else 'unknown'
         })
 
 def get_move_by_difficulty(board, difficulty):
+    """Get an AI move based on the difficulty level.
+    
+    Args:
+        board: A chess.Board object
+        difficulty: 'beginner', 'intermediate', or 'expert'
+        
+    Returns:
+        chess.Move: The selected move
+    """
     if difficulty == 'beginner':
-        if random.random() < 0.3:
+        # Beginner: Shallow search with occasional random moves
+        if random.random() < 0.3:  # 30% chance of random move
             legal_moves = list(board.legal_moves)
             if legal_moves:
                 return random.choice(legal_moves)
+        
+        # Otherwise use a shallow search
         return evaluator.get_best_move(board, depth=1)
-
+    
     elif difficulty == 'intermediate':
+        # Intermediate: Medium depth search
+        return evaluator.get_best_move(board, depth=2)
+    
+    elif difficulty == 'expert':
+        # Expert: Deep search
+        return evaluator.get_best_move(board, depth=3)
+    
+    else:
+        # Default to intermediate
+        logger.warning(f"Unknown difficulty '{difficulty}', defaulting to intermediate")
         return evaluator.get_best_move(board, depth=2)
 
-    elif difficulty == 'expert':
-        return evaluator.get_best_move(board, depth=3)
-
-    logger.warning(f"Unknown difficulty '{difficulty}', defaulting to intermediate")
-    return evaluator.get_best_move(board, depth=2)
-
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))  # Render sets this to 10000
-    logger.info(f"Starting Chess AI API on port {port}")
+    logger.info("Starting Chess AI API server")
+    # Get port from environment variable (Render sets this automatically)
+    port = int(os.environ.get("PORT", 10000))
+    logger.info(f"Starting server on port {port}")
+    # Run the Socket.IO server directly
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
