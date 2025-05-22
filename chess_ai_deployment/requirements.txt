@@ -20,4 +20,3 @@ scikit-learn
 
 # Server dependencies
 eventlet==0.33.0
-gunicorn==20.1.0
