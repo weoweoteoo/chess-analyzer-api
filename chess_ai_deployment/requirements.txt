@@ -11,8 +11,9 @@ python-chess
 stockfish
 
 # Data processing and ML dependencies
-torch==2.0.0+cpu -f https://download.pytorch.org/whl/torch_stable.html 
-numpy==1.22.0  # Updated from 1.21.0 to support Python 3.10
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.0.0+cpu
+numpy==1.22.0
 pandas
 matplotlib
 scikit-learn
