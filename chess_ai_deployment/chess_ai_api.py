@@ -1,14 +1,19 @@
 import os
 import sys
-
-# Compatibility fix for Python 3.10+ (collections.MutableMapping deprecated)
-import collections
-if not hasattr(collections, 'MutableMapping'):
-    collections.MutableMapping = collections.abc.MutableMapping
-
-import chess
 import logging
 import random
+
+# Compatibility fix for Python < 3.10 (MutableMapping deprecated)
+try:
+    from collections.abc import MutableMapping
+except ImportError:
+    from collections import MutableMapping
+
+import collections
+if not hasattr(collections, 'MutableMapping'):
+    collections.MutableMapping = MutableMapping
+
+import chess
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
 from implementation.evaluator import ChessEvaluator
