@@ -15,7 +15,12 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Create a global evaluator instance
-evaluator = ChessEvaluator()
+try:
+    evaluator = ChessEvaluator()
+    logger.info("Chess evaluator initialized successfully")
+except Exception as e:
+    logger.error(f"Error initializing chess evaluator: {e}")
+    # We'll continue and let the application start, but AI moves will fail
 
 @socketio.on('connect')
 def handle_connect():
@@ -141,4 +146,5 @@ if __name__ == '__main__':
     logger.info("Starting Chess AI API server")
     # Get port from environment variable (Railway sets this automatically)
     port = int(os.environ.get("PORT", 5001))
+    # Run the Socket.IO server directly
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
