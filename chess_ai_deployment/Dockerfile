@@ -1,10 +1,19 @@
+FROM python:3.10-slim AS builder
+
+WORKDIR /app
+
+# Install only what's needed for building
+COPY requirements.txt .
+RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
+
+# Second stage - copy only what's needed for runtime
 FROM python:3.10-slim
 
 WORKDIR /app
 
+# Copy only the necessary files
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY . .
-
-RUN pip install --no-cache-dir -r requirements.txt
 
 # Use the PORT environment variable that Railway sets
 EXPOSE $PORT
