@@ -49,10 +49,13 @@ socketio = SocketIO(app, cors_allowed_origins=[
 
 # Create a global evaluator instance
 try:
-    evaluator = ChessEvaluator()
-    logger.info("Chess evaluator initialized successfully")
+    # Specify the path to your traced model
+    model_path = os.path.join(os.path.dirname(__file__), "models", "traced_chess_model.pt")
+    evaluator = ChessEvaluator(model_path)
+    logger.info(f"Chess evaluator initialized successfully with model: {model_path}")
 except Exception as e:
     logger.error(f"Error initializing chess evaluator: {e}")
+    evaluator = None  # Set to None so we can check if it's available later
     # Let the app start, but AI moves will fail if evaluator is broken
 
 @socketio.on('connect')
@@ -66,6 +69,15 @@ def handle_disconnect():
 @socketio.on('request_ai_move')
 def handle_ai_move_request(data):
     logger.info(f"Received AI move request: {data}")
+    
+    # Check if evaluator is available
+    if evaluator is None:
+        socketio.emit('ai_move_response', {
+            'success': False,
+            'error': "Chess evaluator not available. Model could not be loaded.",
+            'game_id': data.get('game_id', 'unknown') if isinstance(data, dict) else 'unknown'
+        })
+        return
     
     try:
         # Parse stringified JSON data if needed
@@ -153,6 +165,14 @@ def get_move_by_difficulty(board, difficulty):
     else:
         logger.warning(f"Unknown difficulty '{difficulty}', defaulting to intermediate")
         return evaluator.get_best_move(board, depth=2)
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for monitoring."""
+    return jsonify({
+        'status': 'ok',
+        'model_loaded': evaluator is not None
+    })
 
 if __name__ == '__main__':
     logger.info("Starting Chess AI API server")
