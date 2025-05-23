@@ -60,14 +60,25 @@ except Exception as e:
 
 @socketio.on('connect')
 def handle_connect():
+    """Handle client connection."""
     logger.info("Client connected")
 
 @socketio.on('disconnect')
 def handle_disconnect():
+    """Handle client disconnection."""
     logger.info("Client disconnected")
 
 @socketio.on('request_ai_move')
 def handle_ai_move_request(data):
+    """Socket event handler for AI move requests.
+    
+    Expected data format:
+    {
+        'moves': ['e4', 'e5', ...],  # List of moves in algebraic notation
+        'difficulty': 'beginner|intermediate|expert',
+        'game_id': 'some-unique-id'
+    }
+    """
     logger.info(f"Received AI move request: {data}")
     
     # Check if evaluator is available
@@ -94,13 +105,16 @@ def handle_ai_move_request(data):
                 })
                 return
         
+        # Extract data from the request
         moves = data.get('moves', [])
         difficulty = data.get('difficulty', 'intermediate')
         game_id = data.get('game_id', 'unknown')
-
+        
+        # Create a board and apply all moves
         board = chess.Board()
         for move_str in moves:
             try:
+                # Try as UCI (e2e4)
                 move = chess.Move.from_uci(move_str)
                 if move in board.legal_moves:
                     board.push(move)
@@ -109,6 +123,7 @@ def handle_ai_move_request(data):
                 pass
             
             try:
+                # Try as SAN (e4)
                 move = board.parse_san(move_str)
                 board.push(move)
             except ValueError:
@@ -120,13 +135,15 @@ def handle_ai_move_request(data):
                 })
                 return
         
+        # Get AI move based on difficulty
         move = get_move_by_difficulty(board, difficulty)
-
+        
         if move:
+            # Prepare response with the AI move
             response = {
                 'success': True,
-                'move': move.uci(),
-                'san': board.san(move),
+                'move': move.uci(),  # UCI format (e.g., "e2e4")
+                'san': board.san(move),  # SAN format (e.g., "e4")
                 'evaluation': evaluator.get_centipawn_score(board),
                 'game_id': game_id
             }
@@ -139,11 +156,12 @@ def handle_ai_move_request(data):
             }
             logger.warning("No legal moves available")
         
+        # Emit the response back to the client
         socketio.emit('ai_move_response', response)
         logger.info(f"Sent AI move response for game {game_id}")
     
     except Exception as e:
-        logger.error(f"Error handling AI move: {e}")
+        logger.error(f"Error handling socket AI move request: {e}")
         socketio.emit('ai_move_response', {
             'success': False,
             'error': str(e),
@@ -151,20 +169,37 @@ def handle_ai_move_request(data):
         })
 
 def get_move_by_difficulty(board, difficulty):
-    """Select a move based on difficulty."""
+    """Get an AI move based on the difficulty level.
+    
+    Args:
+        board: A chess.Board object
+        difficulty: 'beginner', 'intermediate', or 'expert'
+        
+    Returns:
+        chess.Move: The selected move
+    """
     if difficulty == 'beginner':
-        if random.random() < 0.3:
+        # Beginner: Shallow search with occasional random moves
+        if random.random() < 0.3:  # 30% chance of random move
             legal_moves = list(board.legal_moves)
             if legal_moves:
                 return random.choice(legal_moves)
-        return evaluator.get_best_move(board, depth=1)
+        
+        # Otherwise use a shallow search
+        return evaluator.get_best_move(board, depth=1, use_advanced=False)
+    
     elif difficulty == 'intermediate':
-        return evaluator.get_best_move(board, depth=2)
+        # Intermediate: Medium depth search with some advanced techniques
+        return evaluator.get_best_move(board, depth=3, use_advanced=True)
+    
     elif difficulty == 'expert':
-        return evaluator.get_best_move(board, depth=3)
+        # Expert: Deep search with all advanced techniques
+        return evaluator.get_best_move(board, depth=5, use_advanced=True)
+    
     else:
+        # Default to intermediate
         logger.warning(f"Unknown difficulty '{difficulty}', defaulting to intermediate")
-        return evaluator.get_best_move(board, depth=2)
+        return evaluator.get_best_move(board, depth=3, use_advanced=True)
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -176,6 +211,7 @@ def health_check():
 
 if __name__ == '__main__':
     logger.info("Starting Chess AI API server")
+    # Get port from environment variable (Railway sets this automatically)
     port = int(os.environ.get("PORT", 10000))
     logger.info(f"Starting server on port {port}")
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
