@@ -136,18 +136,45 @@ def handle_ai_move_request(data):
                 return
         
         # Get AI move based on difficulty
-        move = get_move_by_difficulty(board, difficulty)
+        ai_move = get_move_by_difficulty(board, difficulty)
         
-        if move:
-            # Prepare response with the AI move
+        if ai_move:
+            # Store the AI move in SAN format before making it
+            ai_move_san = board.san(ai_move)
+            
+            # Make the AI move on the board to get the position for human suggestion
+            board.push(ai_move)
+            
+            # Get suggested move for the human player
+            human_suggestion = get_human_suggestion(board, difficulty)
+            
+            # Prepare response with both AI move and human suggestion
             response = {
                 'success': True,
-                'move': move.uci(),  # UCI format (e.g., "e2e4")
-                'san': board.san(move),  # SAN format (e.g., "e4")
-                'evaluation': evaluator.get_centipawn_score(board),
+                'ai_move': {
+                    'uci': ai_move.uci(),  # UCI format (e.g., "e2e4")
+                    'san': ai_move_san,    # SAN format (e.g., "e4")
+                    'evaluation': evaluator.get_centipawn_score(board)
+                },
+                'human_suggestion': None,  # Will be populated if suggestion is found
                 'game_id': game_id
             }
-            logger.info(f"AI suggests move: {move.uci()} ({board.san(move)})")
+            
+            # Add human suggestion if available
+            if human_suggestion:
+                # Calculate evaluation after the suggested human move
+                board_copy = board.copy()
+                board_copy.push(human_suggestion)
+                suggestion_evaluation = evaluator.get_centipawn_score(board_copy)
+                
+                response['human_suggestion'] = {
+                    'uci': human_suggestion.uci(),
+                    'san': board.san(human_suggestion),
+                    'evaluation': suggestion_evaluation
+                }
+                logger.info(f"Human move suggestion: {human_suggestion.uci()} ({board.san(human_suggestion)})")
+            
+            logger.info(f"AI suggests move: {ai_move.uci()} ({ai_move_san})")
         else:
             response = {
                 'success': False,
@@ -200,6 +227,51 @@ def get_move_by_difficulty(board, difficulty):
         # Default to intermediate
         logger.warning(f"Unknown difficulty '{difficulty}', defaulting to intermediate")
         return evaluator.get_best_move(board, depth=3, use_advanced=True)
+
+def get_human_suggestion(board, difficulty):
+    """Get a suggested move for the human player based on the current position.
+    
+    Args:
+        board: A chess.Board object (current position after AI move)
+        difficulty: The difficulty level of the game
+        
+    Returns:
+        chess.Move: The suggested move for the human player, or None if no suggestion
+    """
+    try:
+        # Check if there are legal moves available
+        legal_moves = list(board.legal_moves)
+        if not legal_moves:
+            return None
+        
+        # Adjust suggestion strength based on difficulty
+        # For harder difficulties, give better suggestions to help the human compete
+        if difficulty == 'beginner':
+            # For beginner AI, give medium-strength suggestions
+            suggestion_depth = 2
+        elif difficulty == 'intermediate':
+            # For intermediate AI, give good suggestions
+            suggestion_depth = 3
+        elif difficulty == 'expert':
+            # For expert AI, give strong suggestions to help human compete
+            suggestion_depth = 4
+        else:
+            suggestion_depth = 3
+        
+        # Get the best move for the human player
+        best_move = evaluator.get_best_move(board, depth=suggestion_depth, use_advanced=True)
+        
+        if best_move and best_move in legal_moves:
+            return best_move
+        else:
+            # Fallback: return a random legal move if evaluator fails
+            return random.choice(legal_moves) if legal_moves else None
+            
+    except Exception as e:
+        logger.error(f"Error getting human suggestion: {e}")
+        # Fallback: return a random legal move
+        legal_moves = list(board.legal_moves)
+        return random.choice(legal_moves) if legal_moves else None
 
 @app.route('/health', methods=['GET'])
 def health_check():
