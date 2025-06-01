@@ -3,12 +3,10 @@ from flask_cors import CORS
 from utils.analyzer import analyze_game
 import logging
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 
-# Enable CORS for your frontend origins
 CORS(app, origins=[
     "http://localhost:5173",
     "https://chess-rating.onrender.com",
@@ -17,7 +15,6 @@ CORS(app, origins=[
     "https://chess-analyzer-api-production.up.railway.app"
 ])
 
-# Global cache for last analyses by playerId + matchId
 last_analysis_result = {}
 
 def remove_consecutive_duplicates(moves):
@@ -47,22 +44,18 @@ def analyze():
     if not all([moves, player_color, winner, player_id, match_id]):
         return jsonify({"error": "Missing required fields: moves, playerColor, winner, playerId, or matchId"}), 400
 
-    # Clean moves
     cleaned_moves = remove_consecutive_duplicates(moves)
     logging.info("Cleaned moves for analysis: %s", cleaned_moves)
 
     try:
         result = analyze_game(cleaned_moves, player_color, winner, engine_path)
 
-        # Store analysis result in cache
         cache_key = f"{player_id}_{match_id}"
         last_analysis_result[cache_key] = result
 
-        # Force HTTPS in result URL
         host = request.host_url.replace("http://", "https://").rstrip("/")
         result_url = f"{host}/api/result?playerId={player_id}&matchId={match_id}"
 
-        # Return only minimal info + result_url
         response = {
             "playerId": player_id,
             "matchId": match_id,
