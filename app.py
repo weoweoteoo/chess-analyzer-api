@@ -18,9 +18,9 @@ CORS(app, origins=[
 last_analysis_result = {}
 
 def remove_consecutive_duplicates(moves):
-    """
-    Removes consecutive duplicate moves (often sent by frontend).
-    """
+    
+    
+    
     cleaned = []
     for move in moves:
         if not cleaned or cleaned[-1] != move:
