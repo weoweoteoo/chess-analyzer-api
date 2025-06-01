@@ -3,11 +3,9 @@ import time
 import logging
 import os
 
-# Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Create a Socket.IO client
 sio = socketio.Client()
 
 @sio.event
@@ -29,10 +27,8 @@ def ai_move_response(data):
 
 def test_ai():
     try:
-        # Connect to the server
         sio.connect('http://localhost:5001')
         
-        # Test with a simple opening position
         logger.info("Testing with initial position + e4")
         sio.emit('request_ai_move', {
             'moves': ['e4'],
@@ -40,10 +36,8 @@ def test_ai():
             'game_id': 'test-game-1'
         })
         
-        # Wait for response
         time.sleep(3)
         
-        # Test with a more complex position
         logger.info("Testing with a more complex position")
         sio.emit('request_ai_move', {
             'moves': ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5'],
@@ -51,10 +45,8 @@ def test_ai():
             'game_id': 'test-game-2'
         })
         
-        # Wait for response
         time.sleep(3)
         
-        # Test with beginner difficulty
         logger.info("Testing with beginner difficulty")
         sio.emit('request_ai_move', {
             'moves': ['d4', 'd5', 'c4'],
@@ -62,13 +54,11 @@ def test_ai():
             'game_id': 'test-game-3'
         })
         
-        # Wait for response
         time.sleep(3)
         
     except Exception as e:
         logger.error(f"Error during test: {e}")
     finally:
-        # Disconnect from the server
         sio.disconnect()
 
 if __name__ == "__main__":
