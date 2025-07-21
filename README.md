@@ -15,7 +15,7 @@ A Flask-based API that analyzes chess games using Stockfish and evaluates player
 
 ## 🚀 Live Demo
 
-> Hosted at: [https://chess-analyzer-api-production.up.railway.app]([https://chess-analyzer-api-production.up.railway.app](https://chess-analyzer-api.onrender.com)])
+> Hosted at: [(https://chess-analyzer-api.onrender.com)]([(https://chess-analyzer-api.onrender.com)])
 
 ---
 
