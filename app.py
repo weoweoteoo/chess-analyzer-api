@@ -13,6 +13,7 @@ CORS(app, origins=[
     "https://chess-rating.vercel.app",
     "https://chess-sh.netlify.app",
     "https://chess-analyzer-api-production.up.railway.app"
+    "https://https://chess-analyzer-api.onrender.com"
 ])
 
 last_analysis_result = {}
