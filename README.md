@@ -35,7 +35,7 @@ A Flask-based API that analyzes chess games using Stockfish and evaluates player
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/yourusername/chess-analyzer-api.git
+git clone https://github.com/weoweoteoo/chess-analyzer-api.git
 cd chess-analyzer-api
 
 
