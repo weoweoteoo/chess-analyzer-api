@@ -16,7 +16,7 @@ A Flask-based API that analyzes chess games using Stockfish and evaluates player
 ## 🚀 Live Demo
 
 > Hosted at: [(https://chess-analyzer-api.onrender.com)]([(https://chess-analyzer-api.onrender.com)])
-
+For direct access go to- https://chess-rating.vercel.app/
 ---
 
 ## 🛠️ Tech Stack
